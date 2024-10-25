@@ -1,5 +1,5 @@
 use std::{
-    hash::{DefaultHasher, Hash, Hasher},
+    hash::{BuildHasher, BuildHasherDefault, Hash, Hasher},
     marker::PhantomData,
 };
 
@@ -72,10 +72,12 @@ pub fn update_with_hash<T>(
 ) where
     T: Resource + Render + Hash,
 {
+    let mut hasher: AHasher = BuildHasherDefault::default().build_hasher();
+    state.hash(&mut hasher);
+    let hash = hasher.finish();
+
     if let Ok((entity, root)) = query.get_single() {
-        let mut hasher = AHasher::default();
-        state.hash(&mut hasher);
-        if root.hash == hasher.finish() {
+        if root.hash == hash {
             debug!("State hashes match, skipping rerender");
             return;
         }
@@ -86,12 +88,13 @@ pub fn update_with_hash<T>(
             warn!("Multiple root entities detected, skipping rerender");
             return;
         }
-    };
+    }
 
     state.render(commands.spawn((
         state.root(),
-        Root {
+        RootHash {
             phantom: PhantomData::<T>,
+            hash,
         },
     )));
 }

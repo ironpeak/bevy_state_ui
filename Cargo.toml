@@ -7,12 +7,16 @@ edition = "2021"
 bevy = { version = "0.14", default-features = false, features = ["bevy_ui"] }
 
 [dev-dependencies]
+bevy_screen_diagnostics = "0.6"
 bevy = { version = "0.14", default-features = false, features = [
     "bevy_text",
     "default_font",
     "bevy_winit",
     "x11",
 ] }
+
+[[example]]
+name = "simple_hash"
 
 [[example]]
 name = "simple"

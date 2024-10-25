@@ -9,7 +9,7 @@ fn main() {
                 .set(ImagePlugin::default_nearest())
                 .set(WindowPlugin {
                     primary_window: Some(Window {
-                        title: "Simple'".to_string(),
+                        title: "Simple Hash'".to_string(),
                         present_mode: PresentMode::Immediate,
                         ..default()
                     }),
@@ -20,7 +20,7 @@ fn main() {
         ))
         .add_systems(Startup, setup)
         .add_systems(Update, update_button_interactions)
-        .register_ui::<State>()
+        .register_ui_with_hash::<State>()
         .run();
 }
 
@@ -29,7 +29,7 @@ fn setup(mut commands: Commands) {
     commands.spawn(Camera2dBundle::default());
 }
 
-#[derive(Resource)]
+#[derive(Resource, Hash)]
 pub struct State {
     pub hovered: bool,
 }
@@ -93,15 +93,9 @@ fn update_button_interactions(
     for interaction in &q_interaction {
         match interaction {
             Interaction::None | Interaction::Pressed => {
-                if !state.hovered {
-                    continue;
-                }
                 state.hovered = false;
             }
             Interaction::Hovered => {
-                if state.hovered {
-                    continue;
-                }
                 state.hovered = true;
             }
         }
