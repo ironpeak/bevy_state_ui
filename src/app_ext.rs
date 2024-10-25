@@ -1,20 +1,34 @@
-use std::marker::PhantomData;
+use std::{
+    hash::{DefaultHasher, Hash, Hasher},
+    marker::PhantomData,
+};
 
-use bevy::prelude::*;
+use bevy::{ecs::system::EntityCommands, prelude::*, utils::AHasher};
 
 #[derive(Component)]
 pub struct Root<T> {
     phantom: PhantomData<T>,
 }
 
+#[derive(Component)]
+pub struct RootHash<T> {
+    phantom: PhantomData<T>,
+    hash: u64,
+}
+
 pub trait Render {
-    fn render(&self, commands: Commands);
+    fn root(&self) -> impl Bundle;
+    fn render(&self, commands: EntityCommands);
 }
 
 pub trait StateUiAppExt {
     fn register_ui<T>(&mut self) -> &mut Self
     where
         T: Resource + Render;
+
+    fn register_ui_with_hash<T>(&mut self) -> &mut Self
+    where
+        T: Resource + Render + Hash;
 }
 
 impl StateUiAppExt for App {
@@ -23,6 +37,14 @@ impl StateUiAppExt for App {
         T: Resource + Render,
     {
         self.add_systems(Update, update::<T>.run_if(resource_changed::<T>));
+        self
+    }
+
+    fn register_ui_with_hash<T>(&mut self) -> &mut Self
+    where
+        T: Resource + Render + Hash,
+    {
+        self.add_systems(Update, update_with_hash::<T>.run_if(resource_changed::<T>));
         self
     }
 }
@@ -35,5 +57,41 @@ where
         commands.entity(entity).despawn_recursive();
     }
 
-    state.render(commands);
+    state.render(commands.spawn((
+        state.root(),
+        Root {
+            phantom: PhantomData::<T>,
+        },
+    )));
+}
+
+pub fn update_with_hash<T>(
+    mut commands: Commands,
+    query: Query<(Entity, &RootHash<T>)>,
+    state: Res<T>,
+) where
+    T: Resource + Render + Hash,
+{
+    if let Ok((entity, root)) = query.get_single() {
+        let mut hasher = AHasher::default();
+        state.hash(&mut hasher);
+        if root.hash == hasher.finish() {
+            debug!("State hashes match, skipping rerender");
+            return;
+        }
+
+        commands.entity(entity).despawn_recursive();
+    } else {
+        if !query.is_empty() {
+            warn!("Multiple root entities detected, skipping rerender");
+            return;
+        }
+    };
+
+    state.render(commands.spawn((
+        state.root(),
+        Root {
+            phantom: PhantomData::<T>,
+        },
+    )));
 }
