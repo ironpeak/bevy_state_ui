@@ -2,6 +2,13 @@
 name = "bevy_state_ui"
 version = "0.1.0"
 edition = "2021"
+description = "A basic state machine for managing sprite animations"
+repository = "https://github.com/ironpeak/bevy_state_ui"
+authors = ["Hrafn Orri Hrafnkelsson <hrafn@vidfjord.is>"]
+license = "MIT"
+readme = "README.md"
+keywords = ["gamedev", "ui", "bevy"]
+categories = ["game-development"]
 
 [dependencies]
 bevy = { version = "0.14", default-features = false, features = ["bevy_ui"] }
