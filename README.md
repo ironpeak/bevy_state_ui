@@ -1,1 +1,105 @@
-# bevy_tree_ui
+# Bevy State UI
+
+This library provides a simple and flexible way to render UI elements in Bevy based on a given application state. Using bevy_state_ui, you can bind UI elements to state properties and update them in real-time as the state changes.
+
+## Features
+
+- **State-Driven UI Rendering:** Renders a UI based directly on state values, allowing for a clean separation between logic and presentation. This simplifies complex UI management by reducing the need for manual component manipulation.
+- **Automatic UI Element Registration**: By implementing the Render trait on a custom state, UI elements are automatically registered and rendered based on the state.
+- **Interaction-Based State Updates**: Provides easy handling of standard UI interactions (e.g., hover, press) by defining state updates within Bevy systems, making the UI more reactive to user input.
+- **Optimized State Hashing (Optional)**: Supports state hashing, which allows for efficient UI updates by skipping unchanged state-based renders. This can improve performance in UIs with frequent state changes.
+
+## Installation
+
+Add bevy_state_ui to your Cargo.toml dependencies:
+
+~~~toml
+[dependencies]
+bevy = "0.14"
+bevy_state_ui = "0.1"
+~~~
+
+## Example Usage
+
+Here's how you can set up a simple UI with a button that changes color when hovered.
+Basic Example
+
+~~~rust
+use bevy::prelude::*;
+use bevy_state_ui::prelude::*;
+
+fn main() {
+    App::new()
+        .add_plugins(DefaultPlugins)
+        .add_systems(Startup, setup)
+        .add_systems(Update, update_button_interactions)
+        .register_ui::<State>()
+        .run();
+}
+
+#[derive(Resource)]
+pub struct State {
+    pub hovered: bool,
+}
+
+impl Render for State {
+    fn render(&self, mut commands: EntityCommands) {
+        commands.with_children(|parent| {
+            parent.spawn(ButtonBundle {
+                style: Style { width: Val::Percent(40.0), height: Val::Percent(15.0), ..default() },
+                background_color: if self.hovered { Color::WHITE.into() } else { Color::BLACK.into() },
+                ..default()
+            }).with_children(|parent| {
+                parent.spawn(TextBundle::from_section("I am a button", TextStyle { font_size: 40.0, ..default() }));
+            });
+        });
+    }
+}
+
+fn update_button_interactions(mut state: ResMut<State>, q: Query<&Interaction, (Changed<Interaction>, With<Button>)>) {
+    if let Some(&interaction) = q.iter().next() {
+        state.hovered = matches!(interaction, Interaction::Hovered);
+    }
+}
+~~~
+
+## Example with Hash Support
+
+Using register_ui_with_hash to improve efficiency in state-dependent UI updates.
+
+~~~rust
+use bevy::prelude::*;
+use bevy_state_ui::prelude::*;
+
+fn main() {
+    App::new()
+        .add_plugins(DefaultPlugins)
+        .add_systems(Startup, setup)
+        .add_systems(Update, update_button_interactions)
+        .register_ui_with_hash::<State>()
+        .run();
+}
+
+#[derive(Resource, Hash)]
+pub struct State {
+    pub hovered: bool,
+}
+
+impl Render for State {
+    fn render(&self, mut commands: EntityCommands) {
+        commands.with_children(|parent| {
+            parent.spawn(ButtonBundle {
+                style: Style { width: Val::Percent(40.0), height: Val::Percent(15.0), ..default() },
+                background_color: if self.hovered { Color::WHITE.into() } else { Color::BLACK.into() },
+                ..default()
+            });
+        });
+    }
+}
+
+fn update_button_interactions(mut state: ResMut<State>, q: Query<&Interaction, (Changed<Interaction>, With<Button>)>) {
+    if let Some(&interaction) = q.iter().next() {
+        state.hovered = matches!(interaction, Interaction::Hovered);
+    }
+}
+~~~
