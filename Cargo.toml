@@ -11,11 +11,13 @@ keywords = ["gamedev", "ui", "bevy"]
 categories = ["game-development"]
 
 [dependencies]
-bevy = { version = "0.14", default-features = false, features = ["bevy_ui"] }
+bevy = { version = "0.15.0-rc.2", default-features = false, features = [
+    "bevy_ui",
+] }
 
 [dev-dependencies]
 bevy_screen_diagnostics = "0.6"
-bevy = { version = "0.14", default-features = false, features = [
+bevy = { version = "0.15.0-rc.2", default-features = false, features = [
     "bevy_text",
     "default_font",
     "bevy_winit",
