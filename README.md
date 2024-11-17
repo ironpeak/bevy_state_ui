@@ -15,7 +15,7 @@ Add bevy_state_ui to your Cargo.toml dependencies:
 ~~~toml
 [dependencies]
 bevy = "0.14.2"
-bevy_state_ui = "0.2.0"
+bevy_state_ui = "0.3.0"
 ~~~
 
 ## Example Usage
