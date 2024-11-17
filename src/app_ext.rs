@@ -32,10 +32,16 @@ impl StateUiAppExt for App {
     }
 }
 
-pub fn ui_state_changed<T>(previous_hash: Res<RenderedHash<T>>, state: Res<T>) -> bool
+pub fn ui_state_changed<T>(previous_hash: Res<RenderedHash<T>>, state: Option<Res<T>>) -> bool
 where
     T: Resource + Hash,
 {
+    let Some(state) = state else { return false };
+
+    if !state.is_added() && !state.is_changed() {
+        return false;
+    }
+
     let mut hasher: AHasher = BuildHasherDefault::default().build_hasher();
     state.hash(&mut hasher);
     let hash = hasher.finish();
@@ -44,6 +50,7 @@ where
         warn!("Failed to lock hash mutex");
         return false;
     };
+
     if *previous_hash == hash {
         debug!("State hashes match, skipping rerender");
         return false;

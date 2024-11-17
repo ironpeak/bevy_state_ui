@@ -20,13 +20,8 @@ fn main() {
         ))
         .add_systems(Startup, setup)
         .add_systems(Update, update_button_interactions)
+        .add_systems(Update, render.run_if(ui_state_changed::<State>))
         .register_ui_state::<State>()
-        .add_systems(
-            Update,
-            render
-                .run_if(resource_changed::<State>)
-                .run_if(ui_state_changed::<State>),
-        )
         .run();
 }
 

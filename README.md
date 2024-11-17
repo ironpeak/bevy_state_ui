@@ -37,7 +37,6 @@ fn main() {
         .add_systems(
             Update,
             render
-                .run_if(resource_changed::<State>)
                 .run_if(ui_state_changed::<State>),
         )
         .run();
