@@ -23,7 +23,4 @@ bevy = { version = "0.14", default-features = false, features = [
 ] }
 
 [[example]]
-name = "simple_hash"
-
-[[example]]
 name = "simple"

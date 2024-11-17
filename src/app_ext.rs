@@ -1,100 +1,55 @@
 use std::{
     hash::{BuildHasher, BuildHasherDefault, Hash, Hasher},
     marker::PhantomData,
+    sync::{Arc, Mutex},
+    u64,
 };
 
-use bevy::{ecs::system::EntityCommands, prelude::*, utils::AHasher};
+use bevy::{prelude::*, utils::AHasher};
 
-#[derive(Component)]
-pub struct Root<T> {
+#[derive(Resource)]
+pub struct RenderedHash<T> {
     phantom: PhantomData<T>,
-}
-
-#[derive(Component)]
-pub struct RootHash<T> {
-    phantom: PhantomData<T>,
-    hash: u64,
-}
-
-pub trait Render {
-    fn root(&self) -> impl Bundle;
-    fn render(&self, commands: EntityCommands);
+    hash: Arc<Mutex<u64>>,
 }
 
 pub trait StateUiAppExt {
-    fn register_ui<T>(&mut self) -> &mut Self
+    fn register_ui_state<T>(&mut self) -> &mut Self
     where
-        T: Resource + Render;
-
-    fn register_ui_with_hash<T>(&mut self) -> &mut Self
-    where
-        T: Resource + Render + Hash;
+        T: Resource;
 }
 
 impl StateUiAppExt for App {
-    fn register_ui<T>(&mut self) -> &mut Self
+    fn register_ui_state<T>(&mut self) -> &mut Self
     where
-        T: Resource + Render,
+        T: Resource,
     {
-        self.add_systems(Update, update::<T>.run_if(resource_changed::<T>));
-        self
-    }
-
-    fn register_ui_with_hash<T>(&mut self) -> &mut Self
-    where
-        T: Resource + Render + Hash,
-    {
-        self.add_systems(Update, update_with_hash::<T>.run_if(resource_changed::<T>));
+        self.insert_resource(RenderedHash::<T> {
+            phantom: PhantomData::default(),
+            hash: Arc::new(Mutex::new(0)),
+        });
         self
     }
 }
 
-pub fn update<T>(mut commands: Commands, query: Query<Entity, With<Root<T>>>, state: Res<T>)
+pub fn ui_state_changed<T>(previous_hash: Res<RenderedHash<T>>, state: Res<T>) -> bool
 where
-    T: Resource + Render,
-{
-    for entity in query.iter() {
-        commands.entity(entity).despawn_recursive();
-    }
-
-    state.render(commands.spawn((
-        state.root(),
-        Root {
-            phantom: PhantomData::<T>,
-        },
-    )));
-}
-
-pub fn update_with_hash<T>(
-    mut commands: Commands,
-    query: Query<(Entity, &RootHash<T>)>,
-    state: Res<T>,
-) where
-    T: Resource + Render + Hash,
+    T: Resource + Hash,
 {
     let mut hasher: AHasher = BuildHasherDefault::default().build_hasher();
     state.hash(&mut hasher);
     let hash = hasher.finish();
 
-    if let Ok((entity, root)) = query.get_single() {
-        if root.hash == hash {
-            debug!("State hashes match, skipping rerender");
-            return;
-        }
-
-        commands.entity(entity).despawn_recursive();
-    } else {
-        if !query.is_empty() {
-            warn!("Multiple root entities detected, skipping rerender");
-            return;
-        }
+    let Ok(mut previous_hash) = previous_hash.hash.lock() else {
+        warn!("Failed to lock hash mutex");
+        return false;
+    };
+    if *previous_hash == hash {
+        debug!("State hashes match, skipping rerender");
+        return false;
     }
 
-    state.render(commands.spawn((
-        state.root(),
-        RootHash {
-            phantom: PhantomData::<T>,
-            hash,
-        },
-    )));
+    *previous_hash = hash;
+
+    true
 }

@@ -1,4 +1,4 @@
-use bevy::{ecs::system::EntityCommands, prelude::*, window::PresentMode};
+use bevy::{prelude::*, window::PresentMode};
 use bevy_screen_diagnostics::{ScreenDiagnosticsPlugin, ScreenFrameDiagnosticsPlugin};
 use bevy_state_ui::prelude::*;
 
@@ -20,7 +20,13 @@ fn main() {
         ))
         .add_systems(Startup, setup)
         .add_systems(Update, update_button_interactions)
-        .register_ui::<State>()
+        .register_ui_state::<State>()
+        .add_systems(
+            Update,
+            render
+                .run_if(resource_changed::<State>)
+                .run_if(ui_state_changed::<State>),
+        )
         .run();
 }
 
@@ -29,27 +35,23 @@ fn setup(mut commands: Commands) {
     commands.spawn(Camera2dBundle::default());
 }
 
-#[derive(Resource)]
+#[derive(Resource, Hash)]
 pub struct State {
     pub hovered: bool,
 }
 
-impl Render for State {
-    fn root(&self) -> impl Bundle {
-        info!("root");
-        NodeBundle {
+fn render(mut commands: Commands, state: Res<State>) {
+    info!("render");
+    commands
+        .spawn(NodeBundle {
             style: Style {
                 width: Val::Percent(100.0),
                 height: Val::Percent(100.0),
                 ..default()
             },
             ..default()
-        }
-    }
-
-    fn render(&self, mut commands: EntityCommands) {
-        info!("render");
-        commands.with_children(|parent| {
+        })
+        .with_children(|parent| {
             parent
                 .spawn(ButtonBundle {
                     style: Style {
@@ -62,7 +64,7 @@ impl Render for State {
                         align_items: AlignItems::Center,
                         ..default()
                     },
-                    background_color: if self.hovered {
+                    background_color: if state.hovered {
                         Color::srgb(1.0, 1.0, 1.0).into()
                     } else {
                         Color::srgb(0.0, 0.0, 0.0).into()
@@ -80,7 +82,6 @@ impl Render for State {
                     ));
                 });
         });
-    }
 }
 
 fn update_button_interactions(
@@ -93,15 +94,9 @@ fn update_button_interactions(
     for interaction in &q_interaction {
         match interaction {
             Interaction::None | Interaction::Pressed => {
-                if !state.hovered {
-                    continue;
-                }
                 state.hovered = false;
             }
             Interaction::Hovered => {
-                if state.hovered {
-                    continue;
-                }
                 state.hovered = true;
             }
         }
