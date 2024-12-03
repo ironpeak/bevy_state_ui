@@ -1,23 +1,21 @@
 use bevy::{prelude::*, window::PresentMode};
-use bevy_screen_diagnostics::{ScreenDiagnosticsPlugin, ScreenFrameDiagnosticsPlugin};
 use bevy_state_ui::prelude::*;
+
+#[derive(Component)]
+struct RootNode;
 
 fn main() {
     App::new()
-        .add_plugins((
-            DefaultPlugins
-                .set(ImagePlugin::default_nearest())
-                .set(WindowPlugin {
-                    primary_window: Some(Window {
-                        title: "Simple'".to_string(),
-                        present_mode: PresentMode::Immediate,
-                        ..default()
-                    }),
+        .add_plugins((DefaultPlugins
+            .set(ImagePlugin::default_nearest())
+            .set(WindowPlugin {
+                primary_window: Some(Window {
+                    title: "Simple'".to_string(),
+                    present_mode: PresentMode::Immediate,
                     ..default()
                 }),
-            ScreenDiagnosticsPlugin::default(),
-            ScreenFrameDiagnosticsPlugin,
-        ))
+                ..default()
+            }),))
         .add_systems(Startup, setup)
         .add_systems(Update, update_button_interactions)
         .add_systems(Update, render.run_if(ui_state_changed::<State>))
@@ -27,7 +25,7 @@ fn main() {
 
 fn setup(mut commands: Commands) {
     commands.insert_resource(State { hovered: false });
-    commands.spawn(Camera2dBundle::default());
+    commands.spawn(Camera2d::default());
 }
 
 #[derive(Resource, Hash)]
@@ -35,21 +33,26 @@ pub struct State {
     pub hovered: bool,
 }
 
-fn render(mut commands: Commands, state: Res<State>) {
+fn render(mut commands: Commands, state: Res<State>, q_root: Query<Entity, With<RootNode>>) {
     info!("render");
+
+    for entity in q_root.iter() {
+        commands.entity(entity).despawn_recursive();
+    }
+
     commands
-        .spawn(NodeBundle {
-            style: Style {
+        .spawn((
+            RootNode,
+            Node {
                 width: Val::Percent(100.0),
                 height: Val::Percent(100.0),
                 ..default()
             },
-            ..default()
-        })
+        ))
         .with_children(|parent| {
             parent
-                .spawn(ButtonBundle {
-                    style: Style {
+                .spawn((
+                    Node {
                         width: Val::Percent(40.0),
                         height: Val::Percent(15.0),
                         top: Val::Percent(42.5),
@@ -59,18 +62,22 @@ fn render(mut commands: Commands, state: Res<State>) {
                         align_items: AlignItems::Center,
                         ..default()
                     },
-                    background_color: if state.hovered {
+                    BackgroundColor(if state.hovered {
                         Color::srgb(1.0, 1.0, 1.0).into()
                     } else {
                         Color::srgb(0.0, 0.0, 0.0).into()
-                    },
-                    ..default()
-                })
+                    }),
+                    Button { ..default() },
+                ))
                 .with_children(|parent| {
-                    parent.spawn(TextBundle::from_section(
-                        "I am a button",
-                        TextStyle {
-                            color: Color::srgb(0.0, 0.0, 0.0),
+                    parent.spawn((
+                        Text::new("I am a button"),
+                        TextColor(if !state.hovered {
+                            Color::srgb(1.0, 1.0, 1.0).into()
+                        } else {
+                            Color::srgb(0.0, 0.0, 0.0).into()
+                        }),
+                        TextFont {
                             font_size: 40.0,
                             ..default()
                         },
