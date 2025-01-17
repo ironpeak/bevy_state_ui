@@ -38,17 +38,21 @@ where
 {
     let Some(state) = state else { return false };
 
+    if !state.is_added() && !state.is_changed() {
+        return false;
+    }
+
     let mut hasher: AHasher = BuildHasherDefault::default().build_hasher();
     state.hash(&mut hasher);
     let hash = hasher.finish();
 
     let Ok(mut previous_hash) = previous_hash.hash.lock() else {
         warn!("Failed to lock hash mutex");
-        return false;
+        return true;
     };
 
     if *previous_hash == hash {
-        debug!("State hashes match, skipping rerender");
+        info!("State hashes match, skipping rerender");
         return false;
     }
 
