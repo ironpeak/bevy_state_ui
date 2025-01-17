@@ -58,6 +58,6 @@ where
 
     *previous_hash = hash;
 
-    debug!("State changed, rerendering");
+    info!("State changed, rerendering");
     true
 }
