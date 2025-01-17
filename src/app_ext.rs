@@ -38,10 +38,6 @@ where
 {
     let Some(state) = state else { return false };
 
-    if !state.is_added() && !state.is_changed() {
-        return false;
-    }
-
     let mut hasher: AHasher = BuildHasherDefault::default().build_hasher();
     state.hash(&mut hasher);
     let hash = hasher.finish();
