@@ -42,10 +42,6 @@ where
 {
     let Some(state) = state else { return false };
 
-    if !state.is_added() && !state.is_changed() {
-        return false;
-    }
-
     let Ok(mut mutex) = previous_hash.hash.lock() else {
         warn!("Failed to lock hash mutex");
         return false;
