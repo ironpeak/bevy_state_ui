@@ -52,11 +52,12 @@ where
     };
 
     if *previous_hash == hash {
-        info!("State hashes match, skipping rerender");
+        debug!("State hashes match, skipping rerender");
         return false;
     }
 
     *previous_hash = hash;
 
+    debug!("State changed, rerendering");
     true
 }
