@@ -55,7 +55,12 @@ pub fn ui_state_render<TState>(
 ) where
     TState: Resource + Hash + StateRender,
 {
-    let Some(state) = state else { return };
+    let Some(state) = state else {
+        for entity in q_root.iter() {
+            commands.entity(entity).despawn();
+        }
+        return;
+    };
 
     if hash.last_frame_check == frame_count.0 {
         return;
