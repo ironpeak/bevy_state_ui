@@ -59,6 +59,7 @@ pub fn ui_state_render<TState>(
         for entity in q_root.iter() {
             commands.entity(entity).despawn();
         }
+        hash.last_hash_value = 0;
         return;
     };
 
