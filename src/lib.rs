@@ -1,7 +1,6 @@
 use std::{
-    hash::{BuildHasher, Hash, Hasher},
+    hash::{BuildHasher, Hash},
     marker::PhantomData,
-    u64,
 };
 
 use bevy::{diagnostic::FrameCount, platform::hash::FixedState, prelude::*};
@@ -38,7 +37,7 @@ impl StateUiAppExt for App {
         TState: Resource,
     {
         self.insert_resource(RenderedHash::<TState> {
-            phantom: PhantomData::default(),
+            phantom: PhantomData,
             last_frame_check: 0,
             last_hash_value: 0,
         });
@@ -67,9 +66,7 @@ pub fn ui_state_render<TState>(
         return;
     }
 
-    let mut hasher = FixedState::default().build_hasher();
-    state.hash(&mut hasher);
-    let value = hasher.finish();
+    let value = FixedState::default().hash_one(&*state);
 
     if hash.last_hash_value == value {
         return;
@@ -83,7 +80,7 @@ pub fn ui_state_render<TState>(
     }
 
     let commands = commands.spawn(RootNode::<TState> {
-        phantom: PhantomData::default(),
+        phantom: PhantomData,
     });
 
     state.render(commands);

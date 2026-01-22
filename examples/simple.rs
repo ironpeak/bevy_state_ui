@@ -3,36 +3,34 @@ use bevy_state_ui::prelude::*;
 
 fn main() {
     App::new()
-        .add_plugins((DefaultPlugins
-            .set(ImagePlugin::default_nearest())
-            .set(WindowPlugin {
-                primary_window: Some(Window {
-                    title: "Simple'".to_string(),
-                    present_mode: PresentMode::Immediate,
-                    ..default()
-                }),
+        .add_plugins((DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                title: "Simple'".to_string(),
+                present_mode: PresentMode::Immediate,
                 ..default()
-            }),))
+            }),
+            ..default()
+        }),))
         .add_systems(Startup, setup)
-        .add_systems(Update, update_button_interactions)
         .add_systems(Update, ui_state_render::<State>)
         .register_ui_state::<State>()
         .run();
 }
 
 fn setup(mut commands: Commands) {
-    commands.insert_resource(State { hovered: false });
-    commands.spawn(Camera2d::default());
+    commands.spawn(Camera2d);
+    commands.init_resource::<State>();
 }
 
-#[derive(Resource, Hash)]
+#[derive(Resource, Hash, Debug, Default)]
 pub struct State {
-    pub hovered: bool,
+    pub count: u128,
 }
 
 impl StateRender for State {
     fn render(&self, mut commands: EntityCommands) {
-        info!("render");
+        info!("UI Rendered!");
+        info!("{self:?}");
 
         commands
             .insert(Node {
@@ -41,63 +39,42 @@ impl StateRender for State {
                 ..default()
             })
             .with_children(|parent| {
+                parent.spawn((
+                    Text::new(format!("Count: {}", self.count)),
+                    TextColor::WHITE,
+                    Node {
+                        position_type: PositionType::Absolute,
+                        top: percent(42.5),
+                        left: percent(35),
+                        ..default()
+                    },
+                ));
+
                 parent
                     .spawn((
+                        Text::new("Click me to increment the Count!"),
                         Node {
-                            width: Val::Percent(40.0),
-                            height: Val::Percent(15.0),
-                            top: Val::Percent(42.5),
-                            left: Val::Percent(30.0),
-                            justify_content: JustifyContent::Center,
                             position_type: PositionType::Absolute,
-                            align_items: AlignItems::Center,
+                            top: percent(50),
+                            left: percent(35),
                             ..default()
                         },
-                        BackgroundColor(if self.hovered {
-                            Color::srgb(1.0, 1.0, 1.0).into()
-                        } else {
-                            Color::srgb(0.0, 0.0, 0.0).into()
-                        }),
-                        Button { ..default() },
-                        if self.hovered {
-                            Interaction::Hovered
-                        } else {
-                            Interaction::None
-                        },
                     ))
-                    .with_children(|parent| {
-                        parent.spawn((
-                            Text::new("I am a button"),
-                            TextColor(if !self.hovered {
-                                Color::srgb(1.0, 1.0, 1.0).into()
-                            } else {
-                                Color::srgb(0.0, 0.0, 0.0).into()
-                            }),
-                            TextFont {
-                                font_size: 40.0,
-                                ..default()
-                            },
-                        ));
-                    });
+                    .observe(on_click)
+                    .observe(|out: On<Pointer<Out>>, mut texts: Query<&mut TextColor>| {
+                        let mut text_color = texts.get_mut(out.entity).unwrap();
+                        text_color.0 = Color::WHITE;
+                    })
+                    .observe(
+                        |over: On<Pointer<Over>>, mut texts: Query<&mut TextColor>| {
+                            let mut color = texts.get_mut(over.entity).unwrap();
+                            color.0 = bevy::color::palettes::tailwind::CYAN_400.into();
+                        },
+                    );
             });
     }
 }
 
-fn update_button_interactions(
-    mut state: ResMut<State>,
-    q_interaction: Query<&Interaction, (Changed<Interaction>, With<Button>)>,
-) {
-    if q_interaction.is_empty() {
-        return;
-    }
-    for interaction in &q_interaction {
-        match interaction {
-            Interaction::Pressed | Interaction::Hovered => {
-                state.hovered = true;
-            }
-            Interaction::None => {
-                state.hovered = false;
-            }
-        }
-    }
+fn on_click(_click: On<Pointer<Click>>, mut state: ResMut<State>) {
+    state.count += 1;
 }
