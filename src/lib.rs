@@ -1,85 +1,117 @@
-use std::{
-    hash::{BuildHasher, Hash},
-    marker::PhantomData,
-};
+use std::marker::PhantomData;
 
-use bevy::{diagnostic::FrameCount, platform::hash::FixedState, prelude::*};
+use bevy::prelude::*;
 
 pub mod prelude {
-    pub use crate::{ui_state_render, StateRender, StateUiAppExt};
+    pub use crate::BevyStateUiPlugin;
+    pub use crate::StateRender;
 }
 
+/// Marker component for the root UI entity managed by the plugin.
 #[derive(Component)]
-pub struct RootNode<T> {
+struct RootNode<T> {
     phantom: PhantomData<T>,
 }
 
+/// Implement this trait on a [`Resource`] to define how it renders as UI.
+///
+/// The provided [`EntityCommands`] refers to the root entity that the plugin
+/// spawns. Insert UI components and children from here.
 pub trait StateRender {
     fn render(&self, commands: EntityCommands);
 }
 
+/// Marker resource inserted when debug logging is enabled for a state type.
 #[derive(Resource)]
-pub struct RenderedHash<T> {
+struct DebugStateRender<T> {
     phantom: PhantomData<T>,
-    last_frame_check: u32,
-    last_hash_value: u64,
 }
 
-pub trait StateUiAppExt {
-    fn register_ui_state<TState>(&mut self) -> &mut Self
-    where
-        TState: Resource;
+/// A Bevy plugin that re-renders UI whenever a [`Resource`] of type `T` changes.
+///
+/// The plugin registers an [`Update`] system that uses Bevy's change detection
+/// to determine when `T` has been modified. On change, the existing root UI
+/// entity is despawned and [`StateRender::render`] is called to rebuild it.
+///
+/// The resource does not need to exist at startup. The system handles
+/// `Option<Res<T>>`, so the resource can be inserted or removed at any time.
+///
+/// # Usage
+/// ```no_run
+/// app.add_plugins(BevyStateUiPlugin::<MyState>::default());
+/// ```
+///
+/// Enable debug logging with the builder method:
+/// ```no_run
+/// app.add_plugins(BevyStateUiPlugin::<MyState>::default().debug());
+/// ```
+pub struct BevyStateUiPlugin<T: Resource + std::fmt::Debug + StateRender> {
+    phantom: PhantomData<T>,
+    debug: bool,
 }
 
-impl StateUiAppExt for App {
-    fn register_ui_state<TState>(&mut self) -> &mut Self
-    where
-        TState: Resource,
-    {
-        self.insert_resource(RenderedHash::<TState> {
-            phantom: PhantomData,
-            last_frame_check: 0,
-            last_hash_value: 0,
-        });
+impl<T: Resource + std::fmt::Debug + StateRender> BevyStateUiPlugin<T> {
+    /// Enables debug logging. When active, prints the state value to stdout
+    /// each time the UI is re-rendered.
+    pub fn debug(mut self) -> Self {
+        self.debug = true;
         self
     }
 }
 
-pub fn ui_state_render<TState>(
+impl<T: Resource + std::fmt::Debug + StateRender> Plugin for BevyStateUiPlugin<T> {
+    fn build(&self, app: &mut App) {
+        if self.debug {
+            app.insert_resource(DebugStateRender::<T> {
+                phantom: PhantomData,
+            });
+        }
+        app.add_systems(Update, ui_state_render::<T>);
+    }
+}
+
+impl<T: Resource + std::fmt::Debug + StateRender> Default for BevyStateUiPlugin<T> {
+    fn default() -> Self {
+        Self {
+            phantom: PhantomData,
+            debug: false,
+        }
+    }
+}
+
+/// System that re-renders UI when the state resource changes.
+///
+/// If the resource is removed, the root entity is despawned (clearing the UI).
+/// If the resource exists and has changed since the last run, the old root
+/// entity is despawned and a new one is spawned via [`StateRender::render`].
+fn ui_state_render<T>(
     mut commands: Commands,
-    frame_count: Res<FrameCount>,
-    mut hash: ResMut<RenderedHash<TState>>,
-    state: Option<Res<TState>>,
-    q_root: Query<Entity, With<RootNode<TState>>>,
+    state: Option<Res<T>>,
+    debug: Option<Res<DebugStateRender<T>>>,
+    root: Query<Entity, With<RootNode<T>>>,
 ) where
-    TState: Resource + Hash + StateRender,
+    T: Resource + std::fmt::Debug + StateRender,
 {
     let Some(state) = state else {
-        for entity in q_root.iter() {
+        for entity in root.iter() {
             commands.entity(entity).despawn();
         }
-        hash.last_hash_value = 0;
         return;
     };
 
-    if hash.last_frame_check == frame_count.0 {
+    if state.is_changed() {
+        if debug.is_some() {
+            println!("[View Rendered] {:?}", state.as_ref());
+        }
+    } else {
         return;
     }
 
-    let value = FixedState::default().hash_one(&*state);
-
-    if hash.last_hash_value == value {
-        return;
-    }
-
-    hash.last_frame_check = frame_count.0;
-    hash.last_hash_value = value;
-
-    for entity in q_root.iter() {
+    for entity in root.iter() {
         commands.entity(entity).despawn();
     }
 
-    let commands = commands.spawn(RootNode::<TState> {
+    let commands = commands.spawn(RootNode::<T> {
         phantom: PhantomData,
     });
 
