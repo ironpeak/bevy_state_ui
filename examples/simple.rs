@@ -1,26 +1,37 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, window::PresentMode};
 use bevy_state_ui::prelude::*;
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
-        .add_plugins(BevyStateUiPlugin::<GameState>::default().debug())
+        .add_plugins((DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                title: "Simple'".to_string(),
+                present_mode: PresentMode::Immediate,
+                ..default()
+            }),
+            ..default()
+        }),))
         .add_systems(Startup, setup)
+        .add_systems(Update, ui_state_render::<State>)
+        .register_ui_state::<State>()
         .run();
 }
 
 fn setup(mut commands: Commands) {
     commands.spawn(Camera2d);
-    commands.init_resource::<GameState>();
+    commands.init_resource::<State>();
 }
 
-#[derive(Resource, Debug, Default)]
-struct GameState {
-    count: usize,
+#[derive(Resource, Hash, Debug, Default)]
+pub struct State {
+    pub count: u128,
 }
 
-impl StateRender for GameState {
+impl StateRender for State {
     fn render(&self, mut commands: EntityCommands) {
+        info!("UI Rendered!");
+        info!("{self:?}");
+
         commands
             .insert(Node {
                 width: Val::Percent(100.0),
@@ -64,6 +75,6 @@ impl StateRender for GameState {
     }
 }
 
-fn on_click(_click: On<Pointer<Click>>, mut state: ResMut<GameState>) {
+fn on_click(_click: On<Pointer<Click>>, mut state: ResMut<State>) {
     state.count += 1;
 }
