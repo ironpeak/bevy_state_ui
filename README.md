@@ -7,8 +7,8 @@ Instead of manually managing UI entities, you declare your state and its `render
 ## Features
 
 - Declarative: define your UI based on a state struct.
-- Efficient: only re-renders UI when the state hash changes.
-- Familiar: integrates seamlessly with Bevy’s ECS and UI system.
+- Efficient: only re-renders UI when the state actually changes (PartialEq comparison).
+- Familiar: integrates seamlessly with Bevy's ECS and UI system.
 - Simple: minimal API, easy to get started.
 
 ## Installation
@@ -17,12 +17,12 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-bevy_state_ui = "0.7"
+bevy_state_ui = "0.8"
 ```
 
 ## Example
 
-Here’s a minimal app with clickable text that increments a counter:
+Here's a minimal app with clickable text that increments a counter:
 
 [examples/simple.rs](examples/simple.rs)
 
@@ -49,7 +49,7 @@ This often leads to boilerplate and imperative code. For example:
 With bevy_state_ui, you flip the model:
 
 - Define your UI as a pure function of state (`impl StateRender for State`).
-- The library automatically detects when state changes (via hashing).
+- The library automatically detects when state changes (via PartialEq comparison).
 - The old UI is despawned and re-rendered from the new state.
 
 This means:
@@ -62,13 +62,16 @@ If your mental model of UI is "render(state) → tree of UI nodes", this library
 
 ## How it works
 
-- You define a `State` struct that implements:
+- You define a state struct that implements:
   - `Resource` (so it can live in the ECS world).
-  - `Hash` (to efficiently detect when state changes).
+  - `Clone + PartialEq` (to detect when the state actually changes).
+  - `Debug` (for optional debug logging).
   - `StateRender` (your declarative UI description).
-- The system `ui_state_render::<State>`:
-  - Computes a hash of the state each frame.
-  - If it changed, despawns the previous UI root and calls your `render` function.
-  - Keeps the UI automatically in sync with your state.
+- Register the plugin: `app.add_plugins(BevyStateUiPlugin::<MyState>::default())`
+- The plugin runs a system each frame that:
+  - Uses Bevy's `is_changed()` as a fast path (zero cost when nothing was mutated).
+  - Compares the current state against a stored previous value via `PartialEq`.
+  - If the state truly changed, despawns the previous UI root and calls your `render` function.
+  - This two-layer approach avoids false re-renders from `DerefMut` access that doesn't change the value.
 
 This lets you think of UI as a pure function of state, much like React, Elm, or SwiftUI.
