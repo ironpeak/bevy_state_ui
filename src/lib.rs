@@ -1,6 +1,9 @@
-use std::{fmt::Debug, marker::PhantomData};
+use std::{fmt::Debug, marker::PhantomData, sync::Mutex};
 
-use bevy::prelude::*;
+use bevy::{
+    ecs::schedule::{BoxedCondition, ScheduleLabel},
+    prelude::*,
+};
 
 pub mod prelude {
     pub use crate::{BevyStateUiPlugin, StateRender};
@@ -25,9 +28,11 @@ struct DebugStateRender<T> {
     phantom: PhantomData<T>,
 }
 
-pub struct BevyStateUiPlugin<T> {
+pub struct BevyStateUiPlugin<T, S: ScheduleLabel = Update> {
     phantom: PhantomData<T>,
     debug: bool,
+    schedule: S,
+    run_conditions: Mutex<Vec<BoxedCondition>>,
 }
 
 impl<T> Default for BevyStateUiPlugin<T> {
@@ -35,18 +40,39 @@ impl<T> Default for BevyStateUiPlugin<T> {
         Self {
             phantom: PhantomData,
             debug: false,
+            schedule: Update,
+            run_conditions: Mutex::new(Vec::new()),
         }
     }
 }
 
-impl<T> BevyStateUiPlugin<T> {
+impl<T, S: ScheduleLabel> BevyStateUiPlugin<T, S> {
     pub fn debug(mut self) -> Self {
         self.debug = true;
         self
     }
+
+    pub fn schedule<S2: ScheduleLabel>(self, schedule: S2) -> BevyStateUiPlugin<T, S2> {
+        BevyStateUiPlugin {
+            phantom: self.phantom,
+            debug: self.debug,
+            schedule,
+            run_conditions: Mutex::new(self.run_conditions.into_inner().unwrap()),
+        }
+    }
+
+    pub fn run_if<M>(self, condition: impl SystemCondition<M>) -> Self {
+        self.run_conditions
+            .lock()
+            .unwrap()
+            .push(Box::new(IntoSystem::into_system(condition)));
+        self
+    }
 }
 
-impl<T: Resource + Clone + PartialEq + Debug + StateRender> Plugin for BevyStateUiPlugin<T> {
+impl<T: Resource + Clone + PartialEq + Debug + StateRender, S: ScheduleLabel + Clone> Plugin
+    for BevyStateUiPlugin<T, S>
+{
     fn build(&self, app: &mut App) {
         app.insert_resource(PreviousState::<T> { value: None });
         if self.debug {
@@ -54,7 +80,12 @@ impl<T: Resource + Clone + PartialEq + Debug + StateRender> Plugin for BevyState
                 phantom: PhantomData,
             });
         }
-        app.add_systems(Update, ui_state_render::<T>);
+        let run_conditions = std::mem::take(&mut *self.run_conditions.lock().unwrap());
+        let mut configs = ui_state_render::<T>.into_configs();
+        for condition in run_conditions {
+            configs.run_if_dyn(condition);
+        }
+        app.add_systems(self.schedule.clone(), configs);
     }
 }
 
