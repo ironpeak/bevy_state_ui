@@ -10,7 +10,7 @@ pub mod prelude {
 }
 
 #[derive(Component)]
-struct RootNode<T> {
+pub struct RootNode<T> {
     phantom: PhantomData<T>,
 }
 
