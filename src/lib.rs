@@ -6,7 +6,7 @@ use bevy::{
 };
 
 pub mod prelude {
-    pub use crate::{BevyStateUiPlugin, StateRender};
+    pub use crate::{BevyStateUiPlugin, RootNode, StateRender};
 }
 
 #[derive(Component)]
@@ -331,5 +331,85 @@ mod tests {
 
         let entity_after = root_node_entity::<TestState>(&mut app);
         assert_eq!(entity, entity_after);
+    }
+
+    #[derive(Resource)]
+    struct RenderEnabled(bool);
+
+    #[test]
+    fn custom_schedule_renders() {
+        let mut app = test_app();
+        app.add_plugins(BevyStateUiPlugin::<TestState>::default().schedule(PostUpdate));
+        app.insert_resource(TestState { value: 42 });
+
+        app.update();
+
+        assert_eq!(root_node_count::<TestState>(&mut app), 1);
+    }
+
+    #[test]
+    fn run_if_blocks_render() {
+        let mut app = test_app();
+        app.insert_resource(RenderEnabled(false));
+        app.add_plugins(
+            BevyStateUiPlugin::<TestState>::default()
+                .run_if(|enabled: Res<RenderEnabled>| enabled.0),
+        );
+        app.insert_resource(TestState { value: 42 });
+
+        app.update();
+
+        assert_eq!(root_node_count::<TestState>(&mut app), 0);
+    }
+
+    #[test]
+    fn run_if_allows_render() {
+        let mut app = test_app();
+        app.insert_resource(RenderEnabled(true));
+        app.add_plugins(
+            BevyStateUiPlugin::<TestState>::default()
+                .run_if(|enabled: Res<RenderEnabled>| enabled.0),
+        );
+        app.insert_resource(TestState { value: 42 });
+
+        app.update();
+
+        assert_eq!(root_node_count::<TestState>(&mut app), 1);
+    }
+
+    #[test]
+    fn chained_configuration() {
+        let mut app = test_app();
+        app.insert_resource(RenderEnabled(true));
+        app.add_plugins(
+            BevyStateUiPlugin::<TestState>::default()
+                .schedule(PostUpdate)
+                .run_if(|enabled: Res<RenderEnabled>| enabled.0)
+                .debug(),
+        );
+        app.insert_resource(TestState { value: 42 });
+
+        app.update();
+
+        assert_eq!(root_node_count::<TestState>(&mut app), 1);
+    }
+
+    #[test]
+    fn run_if_condition_toggle() {
+        let mut app = test_app();
+        app.insert_resource(RenderEnabled(false));
+        app.add_plugins(
+            BevyStateUiPlugin::<TestState>::default()
+                .run_if(|enabled: Res<RenderEnabled>| enabled.0),
+        );
+        app.insert_resource(TestState { value: 42 });
+
+        app.update();
+        assert_eq!(root_node_count::<TestState>(&mut app), 0);
+
+        // Enable rendering and verify it catches up
+        app.world_mut().resource_mut::<RenderEnabled>().0 = true;
+        app.update();
+        assert_eq!(root_node_count::<TestState>(&mut app), 1);
     }
 }
